@@ -1,26 +1,34 @@
 import cv2
 import numpy
 import math
+import time
 from enum import Enum
 
 cam = cv2.VideoCapture()
 
 def main():
     print ("started")
-    cam.open(0)
-    _, cap = cam.read()
-    print(type(cap))
+    #cam.open(0)
+    #_, cap = cam.read()
     x = Pipeline()
-    x.set_source0(cap)             
-    x.process()  
-    print(x.filter_contours_output)
+    #x.set_source0(cap)
+    x.set_source0(cv2.imread("/Users/Joseph/Desktop/tower.png"))
+    while(True):
+        #_, cap = cam.read()
+        x.process()
+        try:
+            print(x.calcCX(x.filter_contours_output))
+        except Exception as e:
+            print (e)
+        time.sleep(1)
+
 class Pipeline:
     """This is a generated class from GRIP.
     To use the pipeline first create a Pipeline instance and set the sources,
     next call the process method,
     finally get and use the outputs.
     """
-    
+
     def __init__(self):
         """initializes all values to presets or None if need to be set
         """
@@ -33,9 +41,9 @@ class Pipeline:
         self.cv_resize_output = None
 
         self.__hsv_threshold_input = self.cv_resize_output
-        self.__hsv_threshold_hue = [83.36330935251799, 180.0]
-        self.__hsv_threshold_saturation = [77.96762589928058, 255.0]
-        self.__hsv_threshold_value = [0.0, 255.0]
+        self.__hsv_threshold_hue = [42.0, 123.0]
+        self.__hsv_threshold_saturation = [142.0, 255.0]
+        self.__hsv_threshold_value = [103.0, 216.0]
         self.hsv_threshold_output = None
 
         self.__find_contours_input = self.hsv_threshold_output
@@ -43,7 +51,7 @@ class Pipeline:
         self.find_contours_output = None
 
         self.__filter_contours_contours = self.find_contours_output
-        self.__filter_contours_min_area = 0
+        self.__filter_contours_min_area = 50
         self.__filter_contours_min_perimeter = 0
         self.__filter_contours_min_width = 0
         self.__filter_contours_max_width = 1000
@@ -56,7 +64,7 @@ class Pipeline:
         self.__filter_contours_max_ratio = 1000
         self.filter_contours_output = None
 
-    
+
     def process(self):
         """Runs the pipeline.
         Sets outputs to new values.
@@ -70,15 +78,19 @@ class Pipeline:
         self.__hsv_threshold_input = self.cv_resize_output
         (self.hsv_threshold_output ) = self.__hsv_threshold(self.__hsv_threshold_input, self.__hsv_threshold_hue, self.__hsv_threshold_saturation, self.__hsv_threshold_value)
         print("thresholded")
-        cv2.imshow("test", self.cv_resize_output) 
+        cv2.imshow("test", self.cv_resize_output)
+        try:
         #Step Find_Contours0:
-        self.__find_contours_input = self.hsv_threshold_output
-        (self.find_contours_output ) = self.__find_contours(self.__find_contours_input, self.__find_contours_external_only)
-        print("contoured")
-        #Step Filter_Contours0:
-        self.__filter_contours_contours = self.find_contours_output
-        (self.filter_contours_output ) = self.__filter_contours(self.__filter_contours_contours, self.__filter_contours_min_area, self.__filter_contours_min_perimeter, self.__filter_contours_min_width, self.__filter_contours_max_width, self.__filter_contours_min_height, self.__filter_contours_max_height, self.__filter_contours_solidity, self.__filter_contours_max_vertices, self.__filter_contours_min_vertices, self.__filter_contours_min_ratio, self.__filter_contours_max_ratio)
-        print("filtered")
+            self.__find_contours_input = self.hsv_threshold_output
+            (self.find_contours_output ) = self.__find_contours(self.__find_contours_input, self.__find_contours_external_only)
+            print("contours found")
+            cv2.imshow("hsv", self.hsv_threshold_output)
+            #Step Filter_Contours0:
+            self.__filter_contours_contours = self.find_contours_output
+            (self.filter_contours_output ) = self.__filter_contours(self.__filter_contours_contours, self.__filter_contours_min_area, self.__filter_contours_min_perimeter, self.__filter_contours_min_width, self.__filter_contours_max_width, self.__filter_contours_min_height, self.__filter_contours_max_height, self.__filter_contours_solidity, self.__filter_contours_max_vertices, self.__filter_contours_min_vertices, self.__filter_contours_min_ratio, self.__filter_contours_max_ratio)
+            print("filtered contours")
+        except Exception as e:
+            print (e)
     def set_source0(self, value):
         """Sets source0 to given value checking for correct type.
         """
@@ -129,8 +141,36 @@ class Pipeline:
         else:
             mode = cv2.RETR_LIST
         method = cv2.CHAIN_APPROX_SIMPLE
-        im2, contours, hierarchy =cv2.findContours(input, mode=mode, method=method)
+        #im2, contours, hierarchy =cv2.findContours(input, mode=mode, method=method)
+        contours, hierarchy =cv2.findContours(input, mode=mode, method=method)
         return contours
+
+
+    @staticmethod
+    def calcCX(output):
+        def calc_center(M):
+            """Detect the center given the moment of a contour."""
+            cx = int(M['m10'] / M['m00'])
+            cy = int(M['m01'] / M['m00'])
+            return cx, cy
+        def polygon(c):
+            """Remove concavities from a contour and turn it into a polygon."""
+            hull = cv2.convexHull(c)
+            epsilon = 0.025 * cv2.arcLength(hull, True)
+            goal = cv2.approxPolyDP(hull, epsilon, True)
+            return goal
+        c = max(output, key=cv2.contourArea)
+        # make sure the largest contour is significant
+        area = cv2.contourArea(c)
+        if area > 0:
+                # make suggested contour into a polygon
+                goal = polygon(c)
+        M = cv2.moments(c)#goal
+        if M['m00'] > 0:
+            cx, cy = calc_center(M)
+            center = (cx, cy)
+            print("CX=" + str(cx))
+        return str(cx)
 
     @staticmethod
     def __filter_contours(input_contours, min_area, min_perimeter, min_width, max_width,
@@ -175,11 +215,11 @@ class Pipeline:
             if (ratio < min_ratio or ratio > max_ratio):
                 continue
             output.append(contour)
+
+
         return output
 
 
-    
+
 if __name__ == '__main__':
     main()
-
-
